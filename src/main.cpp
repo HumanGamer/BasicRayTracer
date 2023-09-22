@@ -36,7 +36,24 @@ glm::vec3 pathTrace(Ray ray, std::vector<Object*> objects, S32 depth)
     if (finalHi.emissive)
         return finalHi.color;
 
-    return glm::vec3(0.f);
+    // Indirect Lighting
+    F32 p = 0.8f;
+    F32 randomNumber = random();
+    if (randomNumber > p)
+        return glm::vec3(0.f);
+
+    Ray randomRay;
+    randomRay.origin = finalHi.hitLocation;
+    randomRay.direction = randomDirection(finalHi.normal);
+
+    F32 cosine = fabs(glm::dot(-ray.direction, finalHi.normal));
+    glm::vec3 originalColor = finalHi.color;
+    glm::vec3 newColor = pathTrace(randomRay, objects, depth + 1) * cosine;
+    glm::vec3 color = newColor * originalColor;
+
+    return color / p;
+
+    //return glm::vec3(0.f);
 }
 
 S32 main()
