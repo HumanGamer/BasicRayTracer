@@ -5,7 +5,7 @@
 #define WINDOW_WIDTH 400
 #define WINDOW_HEIGHT 400
 
-const S32 numSamples = 100;
+const S32 numSamples = 1000;
 const S32 maxDepth = 10;
 const glm::vec3 eye = glm::vec3(0.f, 0.f, 5.f);
 
@@ -95,6 +95,62 @@ S32 main()
     light2.color = glm::vec3(1.f);
     light2.emissive = true;
     objects.push_back(&light2);
+
+    Triangle ceiling1 = Triangle();
+    ceiling1.v1 = glm::vec3(1.f, 1.f, 1.f);
+    ceiling1.v2 = glm::vec3(-1.f, 1.f, -1.f);
+    ceiling1.v3 = glm::vec3(-1.f, 1.f, 1.f);
+    ceiling1.color = glm::vec3(1.f);
+    objects.push_back(&ceiling1);
+
+    Triangle ceiling2 = Triangle();
+    ceiling2.v1 = glm::vec3(1.f, 1.f, 1.f);
+    ceiling2.v2 = glm::vec3(1.f, 1.f, -1.f);
+    ceiling2.v3 = glm::vec3(-1.f, 1.f, -1.f);
+    ceiling2.color = glm::vec3(1.f);
+    objects.push_back(&ceiling2);
+
+    Triangle left1 = Triangle();
+    left1.v1 = glm::vec3(-1.f, -1.f, -1.f);
+    left1.v2 = glm::vec3(-1.f, 1.f, 1.f);
+    left1.v3 = glm::vec3(-1.f, -1.f, 1.f);
+    left1.color = glm::vec3(1.f, 0.f, 0.f);
+    objects.push_back(&left1);
+
+    Triangle left2 = Triangle();
+    left2.v1 = glm::vec3(-1.f, -1.f, -1.f);
+    left2.v2 = glm::vec3(-1.f, 1.f, -1.f);
+    left2.v3 = glm::vec3(-1.f, 1.f, 1.f);
+    left2.color = glm::vec3(1.f, 0.f, 0.f);
+    objects.push_back(&left2);
+
+    Triangle right1 = Triangle();
+    right1.v1 = glm::vec3(1.f, 1.f, 1.f);
+    right1.v2 = glm::vec3(1.f, -1.f, -1.f);
+    right1.v3 = glm::vec3(1.f, -1.f, 1.f);
+    right1.color = glm::vec3(0.f, 1.f, 0.f);
+    objects.push_back(&right1);
+
+    Triangle right2 = Triangle();
+    right2.v1 = glm::vec3(1.f, -1.f, -1.f);
+    right2.v2 = glm::vec3(1.f, 1.f, 1.f);
+    right2.v3 = glm::vec3(1.f, 1.f, -1.f);
+    right2.color = glm::vec3(0.f, 1.f, 0.f);
+    objects.push_back(&right2);
+
+    Triangle back1 = Triangle();
+    back1.v1 = glm::vec3(1.f, -1.f, -1.f);
+    back1.v2 = glm::vec3(-1.f, 1.f, -1.f);
+    back1.v3 = glm::vec3(-1.f, -1.f, -1.f);
+    back1.color = glm::vec3(1.f);
+    objects.push_back(&back1);
+
+    Triangle back2 = Triangle();
+    back2.v1 = glm::vec3(1.f, -1.f, -1.f);
+    back2.v2 = glm::vec3(1.f, 1.f, -1.f);
+    back2.v3 = glm::vec3(-1.f, 1.f, -1.f);
+    back2.color = glm::vec3(1.f);
+    objects.push_back(&back2);
 
     F64* image = new F64[WINDOW_WIDTH * WINDOW_HEIGHT * 3];
     memset(image, 0.0, sizeof(F64) * WINDOW_WIDTH * WINDOW_HEIGHT * 3);
