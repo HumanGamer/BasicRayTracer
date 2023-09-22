@@ -59,7 +59,7 @@ HitInfo Sphere::hit(Ray ray) const
         {
             hi.hit = true;
             hi.t = t;
-            hi.normal = glm::normalize(ray.origin + t * ray.direction) - center;
+            hi.normal = -glm::normalize((ray.origin + t * ray.direction) - center);
             hi.hitLocation = ray.origin + t * ray.direction;
             hi.color = color;
             hi.emissive = emissive;
@@ -72,7 +72,7 @@ HitInfo Sphere::hit(Ray ray) const
         {
             hi.hit = true;
             hi.t = t;
-            hi.normal = glm::normalize(ray.origin + t * ray.direction) - center;
+            hi.normal = -glm::normalize((ray.origin + t * ray.direction) - center);
             hi.hitLocation = ray.origin + t * ray.direction;
             hi.color = color;
             hi.emissive = emissive;
