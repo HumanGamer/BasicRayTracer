@@ -35,6 +35,8 @@ public:
     glm::vec3 color;
     bool emissive;
 
+    Object() : color(0.f), emissive(false) {}
+
     virtual HitInfo hit(Ray ray) const = 0;
 };
 
