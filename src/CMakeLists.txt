@@ -8,9 +8,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(MAIN_SRC
     # Sources
     main.cpp
+    RTLib.cpp
 
     # Headers
     types.h
+    RTLib.h
 )
 
 add_executable(${PROJECT_NAME} ${MAIN_SRC})
