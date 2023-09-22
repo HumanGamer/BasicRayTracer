@@ -1,0 +1,12 @@
+# Project exclude paths
+/build/
+/.vs/
+/.idea/
+*.exe
+*.dll
+*.ilk
+*.pdb
+*.manifest
+*.html
+*.js
+*.wasm
