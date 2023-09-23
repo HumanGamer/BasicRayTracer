@@ -3,132 +3,168 @@
 #include "types.h"
 #include "RTLib.h"
 
-#define RT_MultiThread
+//#define RT_SKY
+#define RT_ACCUMULATE
 
 #define WINDOW_WIDTH 400
 #define WINDOW_HEIGHT 400
 
-const S32 numSamples = 100;
-const S32 maxDepth = 10;
+const S32 lightBounces = 10;
 const glm::vec3 eye = glm::vec3(0.f, 0.f, 5.f);
 
-const F32 brightness = (2.f * 3.1415926f) * (1.f / F32(numSamples));
+S32 frameIndex = 1;
 
-glm::vec3 pathTrace(Ray &ray, std::vector<Object*> &objects, S32 depth)
+#define EPSILON 0.00001f
+
+HitInfo TraceRay(const Ray& ray, std::vector<Object*> &objects)
 {
-    if (depth > maxDepth)
-        return glm::vec3(0.f);
-
-    F64 minT = 10000000.f;
-    HitInfo hi, finalHi;
-
-    for (auto & object : objects)
+    HitInfo hitInfo;
+    S32 closestObject = -1;
+    F32 hitDistance = std::numeric_limits<F32>::max();
+    for (size_t i = 0; i < objects.size(); i++)
     {
-        hi = object->hit(ray);
+        Object &obj = *objects[i];
 
-        if (hi.hit && hi.t < minT)
+        if (obj.type == 1)
         {
-            minT = hi.t;
-            finalHi = hi;
+            // Triangle
+            auto &triangle = static_cast<Triangle&>(obj);
+
+            glm::vec3 originalNormal = glm::normalize(glm::cross(triangle.v2 - triangle.v1, triangle.v3 - triangle.v1));
+            glm::vec3 n = originalNormal;
+
+            if (glm::dot(n, ray.direction) > 0.f)
+                n = -n;
+
+            // Case 1 - Hit nothing
+            if (fabs(glm::dot(n, ray.direction)) < EPSILON)
+                continue;
+
+            // Case 2 - Hit nothing
+            F32 t = (glm::dot(n, triangle.v1) - glm::dot(ray.origin, n)) / glm::dot(ray.direction, n);
+            if (fabs(t) < 0.0005f)
+                continue;
+
+            glm::vec3 p = ray.origin + ray.direction * t;
+
+            glm::vec3 c1 = glm::cross(triangle.v2 - triangle.v1, p - triangle.v1);
+            glm::vec3 c2 = glm::cross(triangle.v3 - triangle.v2, p - triangle.v2);
+            glm::vec3 c3 = glm::cross(triangle.v1 - triangle.v3, p - triangle.v3);
+
+            // Case 3 - Not inside the triangle
+            if (glm::dot(c1, originalNormal) < 0.f || glm::dot(c2, originalNormal) < 0.f || glm::dot(c3, originalNormal) < 0.f)
+                continue;
+
+            // We have hit something inside the triangle
+            if (t > 0.0f && t < hitDistance)
+            {
+                hitInfo.t = t;
+                hitInfo.hitLocation = p;
+                hitInfo.normal = n;
+                hitInfo.color = triangle.color;
+                hitInfo.emissive = triangle.emissive;
+
+                hitDistance = t;
+                closestObject = (S32) i;
+            }
+        }
+        else if (obj.type == 2)
+        {
+            // Sphere
+            const auto& sphere = static_cast<const Sphere&>(obj);
+
+            glm::vec3 origin = ray.origin - sphere.center;
+
+            F32 a = glm::dot(ray.direction, ray.direction);
+            F32 b = 2.0f * glm::dot(origin, ray.direction);
+            F32 c = glm::dot(origin, origin) - sphere.radius * sphere.radius;
+
+            F32 discriminant = b * b - 4.0f * a * c;
+            if (discriminant < 0.0f)
+                continue;
+
+            F32 closestT = (-b - glm::sqrt(discriminant)) / (2.0f * a);
+            if (closestT > 0.0f && closestT < hitDistance)
+            {
+                hitDistance = closestT;
+                closestObject = (S32)i;
+
+                hitInfo.color = sphere.color;
+                hitInfo.emissive = sphere.emissive;
+                hitInfo.t = hitDistance;
+                hitInfo.hitLocation = origin + ray.direction * hitDistance;
+                hitInfo.normal = glm::normalize(hitInfo.hitLocation);
+
+                hitInfo.hitLocation += sphere.center;
+            }
         }
     }
 
-    if (!finalHi.hit)
-        return glm::vec3(0.f);
+    if (closestObject < 0)
+    {
+        hitInfo.t = -1.0f;
+        return hitInfo;
+    }
 
-    if (finalHi.emissive)
-        return finalHi.color;
-
-    // Indirect Lighting
-    F32 p = 0.8f;
-    F32 randomNumber = random();
-    if (randomNumber > p)
-        return glm::vec3(0.f);
-
-    Ray randomRay;
-    randomRay.origin = finalHi.hitLocation;
-    randomRay.direction = randomDirection(finalHi.normal);
-
-    F32 cosine = fabs(glm::dot(-ray.direction, finalHi.normal));
-    glm::vec3 originalColor = finalHi.color;
-    glm::vec3 newColor = pathTrace(randomRay, objects, depth + 1) * cosine;
-    glm::vec3 color = newColor * originalColor;
-
-    return color / p;
-
-    //return glm::vec3(0.f);
+    return hitInfo;
 }
 
-void render(std::vector<Object*> &objects, F64* &p, S32 x, S32 y)
+glm::vec3 renderPixel(std::vector<Object*> &objects/*, F64* &p*/, S32 x, S32 y)
 {
-    HitInfo hi, finalHi;
     Ray ray;
-    F32 i = 0.f, j = 0.f, minT = 10000000.f;
-    glm::vec3 color = glm::vec3(0.f);
-    minT = 10000000.f;
-    finalHi.hit = false;
-    hi.hit = false;
-    color = glm::vec3(0.f);
+    glm::vec3 light(0.0f);
+    glm::vec3 contribution(1.0f);
 
-    i = (2.f * F32(x) / F32(WINDOW_WIDTH)) - 1.f;
-    j = (2.f * F32(WINDOW_HEIGHT - y) / F32(WINDOW_HEIGHT)) - 1.f;
+    F32 i = (2.f * F32(x) / F32(WINDOW_WIDTH)) - 1.f;
+    F32 j = (2.f * F32(WINDOW_HEIGHT - y) / F32(WINDOW_HEIGHT)) - 1.f;
 
     ray.origin = glm::vec3(i, j, 1.2f);
     ray.direction = glm::normalize(ray.origin - eye);
 
-    for (auto object : objects)
+    for (S32 k = 0; k < lightBounces; k++)
     {
-        hi = object->hit(ray);
-        if (hi.hit && hi.t < minT)
-        {
-            finalHi = hi;
-            minT = hi.t;
-        }
-    }
+        HitInfo finalHi = TraceRay(ray, objects);
 
-    if (finalHi.hit)
-    {
-        //color = finalHi.color;
-        if (finalHi.emissive)
-            color = finalHi.color;
+        if (finalHi.t < 0.0f)
+        {
+#ifdef RT_SKY
+            glm::vec3 skyColor = glm::vec3(0.6f, 0.7f, 0.9f);
+            light += contribution * skyColor;
+#else
+            light += contribution;
+#endif
+            break;
+        }
         else
         {
-            Ray randomRay;
-            randomRay.origin = finalHi.hitLocation;
-            randomRay.direction = randomDirection(finalHi.normal);
+                ray.origin = finalHi.hitLocation + finalHi.normal * 0.0001f;
+                ray.direction = glm::normalize(finalHi.normal + glm::normalize(RandomInUnitSphere()));
 
-            glm::vec3 originalColor = finalHi.color;
-            glm::vec3 newColor = pathTrace(randomRay, objects, 0);
-
-            color = newColor * originalColor;
-
-            color *= brightness;
+                contribution *= finalHi.color;
+                if (finalHi.emissive)
+                    light += finalHi.color;
         }
     }
 
-    U32 index = (x + y * WINDOW_WIDTH) * 3;
-
-    p[index + 0] += color.r;
-    p[index + 1] += color.g;
-    p[index + 2] += color.b;
-
-//    *p += color.r;
-//    p++;
-//    *p += color.g;
-//    p++;
-//    *p += color.b;
-//    p++;
+    return light;
 }
 
 S32 main()
 {
-    std::vector<Object*> objects;
+    std::vector<Object *> objects;
 
     Sphere sphere;
     sphere.center = glm::vec3(0.0f, -0.7f, -0.5f);
     sphere.radius = 0.3f;
-    sphere.color = glm::vec3(2.f);
+    sphere.color = glm::vec3(1.f);
     objects.push_back(&sphere);
+
+    Sphere sphere2;
+    sphere2.center = glm::vec3(1.0f, -0.7f, -0.5f);
+    sphere2.radius = 0.3f;
+    sphere2.color = glm::vec3(2.f, 0.f, 0.f);
+    sphere2.emissive = true;
+    //objects.push_back(&sphere2);
 
     Triangle floor1 = Triangle();
     floor1.v1 = glm::vec3(1.f, -1.f, 1.f);
@@ -216,9 +252,8 @@ S32 main()
     back2.color = glm::vec3(1.f);
     objects.push_back(&back2);
 
-    F64* image = new F64[WINDOW_WIDTH * WINDOW_HEIGHT * 3];
-    memset(image, 0.0, sizeof(F64) * WINDOW_WIDTH * WINDOW_HEIGHT * 3);
-    F64* p = image;
+    auto *image = new glm::vec3[WINDOW_WIDTH * WINDOW_HEIGHT];
+    memset(image, 0.0, sizeof(glm::vec3) * WINDOW_WIDTH * WINDOW_HEIGHT);
 
     sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Ray Tracer");
 
@@ -231,10 +266,6 @@ S32 main()
     sf::Sprite sprite;
     sprite.setTexture(texture);
 
-    // Declaring variables here to prevent numerous re-declarations within while loop
-    S32 s = 0;
-    //S32 r = 0, g = 0, b = 0;
-
     std::vector<S32> imageVertIter, imageHorizIter;
     imageVertIter.resize(WINDOW_HEIGHT);
     imageHorizIter.resize(WINDOW_WIDTH);
@@ -243,83 +274,42 @@ S32 main()
     for (S32 i = 0; i < WINDOW_WIDTH; i++)
         imageHorizIter[i] = i;
 
-    while(window.isOpen())
+    while (window.isOpen())
     {
-        if (s < numSamples)
+        if (frameIndex == 1)
         {
-            p = image;
-
-#ifdef RT_MultiThread
-            std::for_each(std::execution::par, imageVertIter.begin(), imageVertIter.end(),
-              [&](S32 y)
-              {
-                  std::for_each(std::execution::par, imageHorizIter.begin(), imageHorizIter.end(),
-                    [&](S32 x)
-                    {
-                        render(objects, p, x, y);
-                    });
-              });
-
-            std::for_each(std::execution::par, imageVertIter.begin(), imageVertIter.end(),
-              [&](S32 yy)
-              {
-                  std::for_each(std::execution::par, imageHorizIter.begin(), imageHorizIter.end(),
-                    [&](S32 xx)
-                    {
-                        U32 index = (xx + yy * WINDOW_WIDTH) * 3;
-
-                        U32 r = glm::clamp(pow(p[index + 0], 1.0f / 2.2f) * 255, 0.0, 255.0);
-                        U32 g = glm::clamp(pow(p[index + 1], 1.0f / 2.2f) * 255, 0.0, 255.0);
-                        U32 b = glm::clamp(pow(p[index + 2], 1.0f / 2.2f) * 255, 0.0, 255.0);
-
-                        sfImage.setPixel(xx, yy, sf::Color(r, g, b));
-                    });
-              });
-#else
-            for (S32 y = 0; y < WINDOW_HEIGHT; y++)
-            {
-                for (S32 x = 0; x < WINDOW_WIDTH; x++)
-                {
-                    render(rtStruct, objects, p, x, y);
-                }
-            }
-
-            for (S32 yy = 0; yy < WINDOW_HEIGHT; yy++)
-            {
-                for (S32 xx = 0; xx < WINDOW_WIDTH; xx++)
-                {
-
-                    U32 index = (xx + yy * WINDOW_WIDTH) * 3;
-
-                    U32 r = glm::clamp(pow(p[index + 0], 1.0f / 2.2f) * 255, 0.0, 255.0);
-                    U32 g = glm::clamp(pow(p[index + 1], 1.0f / 2.2f) * 255, 0.0, 255.0);
-                    U32 b = glm::clamp(pow(p[index + 2], 1.0f / 2.2f) * 255, 0.0, 255.0);
-
-                    sfImage.setPixel(xx, yy, sf::Color(r, g, b));
-                }
-            }
-#endif
-
-            texture.loadFromImage(sfImage);
-            sprite.setTexture(texture);
-
-            s++;
-
-            printf("Sample %d/%d\n", s, numSamples);
-        } else
-        {
-            static bool printed = false;
-            if (!printed)
-            {
-                printf("Done!\n");
-                printed = true;
-            }
+            memset(image, 0.0, sizeof(glm::vec3) * WINDOW_WIDTH * WINDOW_HEIGHT);
         }
 
-        sf::Event sfEvent;
-        while(window.pollEvent(sfEvent))
+        std::for_each(std::execution::par, imageVertIter.begin(), imageVertIter.end(), [&](S32 y)
         {
-            if(sfEvent.type == sf::Event::Closed)
+            std::for_each(std::execution::par, imageHorizIter.begin(), imageHorizIter.end(), [&](S32 x)
+            {
+                glm::vec3 color = renderPixel(objects, x, y);
+                image[x + y * WINDOW_WIDTH] += color;
+
+                glm::vec3 accumColor = image[x + y * WINDOW_WIDTH];
+                accumColor /= (F32) frameIndex;
+
+                accumColor = glm::clamp(accumColor, glm::vec3(0.f), glm::vec3(1.f));
+
+                sfImage.setPixel(x, y, sf::Color(accumColor.r * 255.0, accumColor.g * 255.0, accumColor.b * 255.0));
+            });
+        });
+
+        texture.loadFromImage(sfImage);
+        sprite.setTexture(texture);
+
+#ifdef RT_ACCUMULATE
+        frameIndex++;
+#else
+      frameIndex = 1;
+#endif
+
+        sf::Event sfEvent;
+        while (window.pollEvent(sfEvent))
+        {
+            if (sfEvent.type == sf::Event::Closed)
             {
                 window.close();
             }
