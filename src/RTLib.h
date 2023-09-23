@@ -37,7 +37,7 @@ public:
 
     Object() : color(0.f), emissive(false) {}
 
-    virtual HitInfo hit(Ray ray) const = 0;
+    virtual HitInfo hit(Ray &ray) const = 0;
 };
 
 class Triangle : public Object
@@ -47,7 +47,7 @@ public:
 
     Triangle() : v1(0.f), v2(0.f), v3(0.f) {}
 
-    HitInfo hit(Ray ray) const override;
+    HitInfo hit(Ray &ray) const override;
 };
 
 class Sphere : public Object
@@ -58,7 +58,7 @@ public:
 
     Sphere() : radius(0.f), center(0.f) {}
 
-    HitInfo hit(Ray ray) const override;
+    HitInfo hit(Ray &ray) const override;
 };
 
 extern F32 random();

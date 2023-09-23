@@ -1,6 +1,6 @@
 #include "RTLib.h"
 
-HitInfo Triangle::hit(Ray ray) const
+HitInfo Triangle::hit(Ray &ray) const
 {
     HitInfo hi;
 
@@ -40,7 +40,7 @@ HitInfo Triangle::hit(Ray ray) const
     return hi;
 }
 
-HitInfo Sphere::hit(Ray ray) const
+HitInfo Sphere::hit(Ray &ray) const
 {
     HitInfo hi;
     F32 t;
